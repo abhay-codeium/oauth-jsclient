@@ -847,4 +847,62 @@ describe('Tests for OAuthClient to set custom Authorization URIs', () => {
     });
   });
 
+  describe('FormData Upload Tests', () => {
+    it('Should handle FormData upload without manual headers', (done) => {
+      const FormData = require('form-data');
+      
+      nock('https://sandbox-quickbooks.api.intuit.com')
+        .post('/v3/company/123/upload')
+        .query({ minorversion: '69' })
+        .reply(200, { 
+          AttachableResponse: [{ 
+            Attachable: { 
+              Id: '456',
+              FileName: 'test.txt',
+              ContentType: 'text/plain'
+            }
+          }]
+        }, {
+          'content-type': 'application/json',
+          'content-length': '150',
+          intuit_tid: 'upload-test-123',
+        });
+
+      const form = new FormData();
+      form.append('file_content_01', 'test file content', {
+        filename: 'test.txt',
+        contentType: 'text/plain',
+      });
+      form.append('file_metadata_01', JSON.stringify({
+        AttachableRef: [{ EntityRef: { type: 'Item', value: '123' } }],
+        ContentType: 'text/plain',
+        FileName: 'test.txt',
+      }), {
+        contentType: 'application/json',
+        filename: 'file_metadata_01',
+      });
+
+      oauthClient.setToken({
+        token_type: 'bearer',
+        access_token: 'test_access_token',
+        refresh_token: 'test_refresh_token',
+        expires_in: 3600,
+        realmId: '123',
+      });
+
+      oauthClient
+        .makeApiCall({
+          url: 'https://sandbox-quickbooks.api.intuit.com/v3/company/123/upload?minorversion=69',
+          method: 'POST',
+          body: form,
+        })
+        .then((authResponse) => {
+          expect(authResponse.json.AttachableResponse).to.exist;
+          expect(authResponse.json.AttachableResponse[0].Attachable.FileName).to.equal('test.txt');
+          done();
+        })
+        .catch(done);
+    });
+  });
+
 });

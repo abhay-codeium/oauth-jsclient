@@ -489,7 +489,47 @@ In order to save the PDF generated from the APIs properly, the correct transport
 ```
 .makeApiCall({ url: `${url}v3/company/${companyID}/invoice/${invoiceNumber}/pdf?minorversion=59` , headers:{'Content-Type': 'application/pdf','Accept':'application/pdf'}, transport: popsicle.createTransport({type: 'buffer'})})
 ```
-The response is an actual buffer( binary BLOB) which could then be saved to the file. 
+The response is an actual buffer( binary BLOB) which could then be saved to the file.
+
+#### File Upload with FormData
+When uploading files using FormData, do NOT manually spread the FormData headers. Let axios handle the content-length and boundary headers automatically:
+
+```javascript
+const FormData = require('form-data');
+const fs = require('fs');
+
+// Create FormData object
+const form = new FormData();
+form.append('file_content_01', fs.createReadStream('/path/to/file.pdf'), {
+  filename: 'document.pdf',
+  contentType: 'application/pdf',
+});
+form.append('file_metadata_01', JSON.stringify({
+  AttachableRef: [{ EntityRef: { type: 'Item', value: '123' } }],
+  ContentType: 'application/pdf',
+  FileName: 'document.pdf',
+}), {
+  contentType: 'application/json',
+  filename: 'file_metadata_01',
+});
+
+// CORRECT: Let axios handle FormData headers automatically
+const response = await oauthClient.makeApiCall({
+  url: '/v3/company/123/upload?minorversion=69',
+  method: 'POST',
+  body: form, // Don't spread form.getHeaders()
+});
+
+// INCORRECT: Manual header spreading causes content-length issues
+// const response = await oauthClient.makeApiCall({
+//   url: '/v3/company/123/upload?minorversion=69',
+//   method: 'POST',
+//   headers: {
+//     ...form.getHeaders(), // This prevents axios from setting content-length
+//   },
+//   body: form,
+// });
+```
 
 ### Auth-Response
 
